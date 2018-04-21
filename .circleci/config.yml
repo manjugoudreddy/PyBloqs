@@ -1,0 +1,90 @@
+version: 2
+jobs:
+  build:
+    working_directory: ~/manahl/PyBloqs
+    parallelism: 1
+    shell: /bin/bash --login
+    environment:
+      CIRCLE_ARTIFACTS: /tmp/circleci-artifacts
+      CIRCLE_TEST_REPORTS: /tmp/circleci-test-results
+      COVERALLS_REPO_TOKEN: WnzSri2b3no9Fh0buPancG1krS4jVfQiG
+    # In CircleCI 1.0 we used a pre-configured image with a large number of languages and other packages.
+    # In CircleCI 2.0 you can now specify your own image, or use one of our pre-configured images.
+    # The following configuration line tells CircleCI to use the specified docker image as the runtime environment for you job.
+    # We have selected a pre-built image that mirrors the build environment we use on
+    # the 1.0 platform, but we recommend you choose an image more tailored to the needs
+    # of each job. For more information on choosing an image (or alternatively using a
+    # VM instead of a container) see https://circleci.com/docs/2.0/executor-types/
+    # To see the list of pre-built images that CircleCI provides for most common languages see
+    # https://circleci.com/docs/2.0/circleci-images/
+    docker:
+    - image: circleci/build-image:2.7-stretch
+    #  command: /sbin/init
+    steps:
+    - checkout
+    # Prepare for artifact and test results  collection equivalent to how it was done on 1.0.
+    # In many cases you can simplify this from what is generated here.
+    # 'See docs on artifact collection here https://circleci.com/docs/2.0/artifacts/'
+    - run: mkdir -p $CIRCLE_ARTIFACTS $CIRCLE_TEST_REPORTS
+    # Dependencies
+    #   This would typically go in either a build or a build-and-test job when using workflows
+    # Restore the dependency cache
+    - restore_cache:
+        keys:
+        # This branch if available
+        - v1-dep-{{ .Branch }}-
+        # Default branch if not
+        - v1-dep-master-
+        # Any branch if there are none on the default branch - this should be unnecessary if you have your default branch configured correctly
+        - v1-dep-
+    # This is based on your 1.0 configuration file or project settings
+    - run: wget https://downloads.wkhtmltopdf.org/0.12/0.12.4/wkhtmltox-0.12.4_linux-generic-amd64.tar.xz
+    - run: tar Jxvf wkhtmltox-0.12.4_linux-generic-amd64.tar.xz
+    # - run: sudo apt-get update
+    # - run: sudo apt-get install poppler-utils
+    # - run: sudo apt-get install pandoc
+    # - run: sudo apt-get install python-tk
+    - run: pip install virtualenv
+    - run: virtualenv ci
+    - run: . ci/bin/activate
+    - run: pip install beautifulsoup4
+    - run: pip install matplotlib
+    - run: pip install markdown
+    - run: pip install html5lib
+    - run: pip install pandas
+    - run: pip install docutils
+    - run: pip install lxml
+    - run: pip install pyyaml
+    - run: pip install jinja2
+    - run: pip install mock
+    - run: pip install pytest
+    - run: pip install pytest-cov
+    - run: pip install coveralls
+    - run: pip install sphinx==1.6.5
+    - run: pip install nbsphinx
+    - run: pip install ipython[notebook]
+    - run: pip install jsmin
+    - run: npm install highcharts highcharts-heatmap highcharts-export-csv highcharts-exporting highcharts-funnel
+    - run: python setup.py install  --highcharts=node_modules/highcharts/,node_modules/highcharts-heatmap/,node_modules/highcharts-funnel,node_modules/highcharts-exporting,node_modules/highcharts-export-csv --wkhtmltopdf=wkhtmltox/bin
+    - run: python setup.py load_highcharts  --highcharts=node_modules/highcharts/js,node_modules/highcharts-heatmap/,node_modules/highcharts-funnel,node_modules/highcharts-exporting,node_modules/highcharts-export-csv
+    # Save dependency cache
+    - save_cache:
+        key: v1-dep-{{ .Branch }}-{{ epoch }}
+        paths:
+        # This is a broad list of cache paths to include many possible development environments
+        # You can probably delete some of these entries
+        - ~/ci
+        - ~/wkhtmltox
+    # Test
+    - run: python setup.py test
+    # This is based on your 1.0 configuration file or project settings
+    - run: coveralls
+    - run: python setup.py build_sphinx
+    # Save test results
+    - store_test_results:
+        path: /tmp/circleci-test-results
+    # Save artifacts
+    - store_artifacts:
+        path: /tmp/circleci-artifacts
+    - store_artifacts:
+        path: /tmp/circleci-test-results
